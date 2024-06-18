@@ -7,7 +7,6 @@ from pydantic import BaseModel
 import subprocess
 import os
 import psutil
-import datetime
 from typing import Optional, Dict, Any
 
 app = FastAPI(
@@ -95,6 +94,9 @@ def normalize_script_name(script_name: str) -> str:
 def start_target_script(script_name: str, arguments: Optional[str] = None) -> (Optional[int], Optional[str]):
     try:
         script_path = os.path.join(os.getcwd(), script_name)
+        if not os.path.exists(script_path):
+            logging.error(f"Script {script_name} not found at path {script_path}")
+            return None, None
         command = ["python", script_path]
         if arguments:
             command.extend(arguments.split())
@@ -193,6 +195,8 @@ def start_script(script_status: StartScriptStatus, username: str = Depends(get_c
         target_scripts[script_status.script_name] = {"status": "run", "arguments": script_status.arguments}
         write_target_scripts(target_scripts)
         return {"message": f"Started {script_status.script_name} with PID {pid}", "path": script_path}
+    elif script_path is None:
+        raise HTTPException(status_code=404, detail=f"Script {script_status.script_name} not found at the specified path")
     else:
         raise HTTPException(status_code=500, detail="Failed to start script")
 
@@ -223,7 +227,7 @@ def monitor_script(script_name: str = None, username: str = Depends(get_current_
     if script_name:
         script_name = normalize_script_name(script_name)
         if script_name not in target_scripts:
-            raise HTTPException(status_code=404, detail="Script not found in target scripts")
+            raise HTTPException(status_code=404, detail="Script not found in sp_on_board.txt")
         status_info = {"script_name": script_name, "status": "not running", "pid": None, "path": os.path.join(os.getcwd(), script_name), "required_status": target_scripts[script_name]["status"], "arguments": target_scripts[script_name]["arguments"]}
         if script_name in target_pids:
             status_info.update(monitor_target_script(target_pids[script_name], script_name))
@@ -249,7 +253,7 @@ def remove_script(script_name: str, username: str = Depends(get_current_username
     script_name = normalize_script_name(script_name)
     target_scripts = read_target_scripts()
     if script_name not in target_scripts:
-        raise HTTPException(status_code=404, detail="Script not found in target scripts")
+        raise HTTPException(status_code=404, detail="Script not found in sp_on_board.txt")
     if script_name in target_pids:
         raise HTTPException(status_code=400, detail="Cannot remove a running script. Stop the script first.")
     if target_scripts[script_name]["status"] == "run":
@@ -257,7 +261,7 @@ def remove_script(script_name: str, username: str = Depends(get_current_username
     
     del target_scripts[script_name]
     write_target_scripts(target_scripts)
-    return {"message": f"Removed {script_name} from target scripts"}
+    return {"message": f"Removed {script_name} from sp_on_board.txt"}
 
 @app.get("/health", summary="Health check", description="Check the health of the ScriptPilot API.", response_model=Dict[str, str])
 def health_check():
