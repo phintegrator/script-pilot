@@ -1,0 +1,8 @@
+# files
+script_pilot.log
+sp_config.json
+sp_on_board.txt
+
+
+# folders
+sp_venv
