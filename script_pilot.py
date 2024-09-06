@@ -8,6 +8,7 @@ import subprocess
 import os
 import psutil
 from typing import Optional, Dict, Any
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Script Pilot API",
@@ -177,6 +178,15 @@ def get_current_username(credentials: HTTPBasicCredentials = Depends(security)) 
         detail="Invalid credentials",
         headers={"WWW-Authenticate": "Basic"},
     )
+
+# Add CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 
 @app.post("/start_script/", summary="Start a script", description="Start a specified script if it's not already running.", response_model=Dict[str, str])
 def start_script(script_status: StartScriptStatus, username: str = Depends(get_current_username)):
